@@ -1,11 +1,11 @@
 import torch
 import matplotlib.pyplot as plt
-import packages.data as data
-import models.Net as Net
-import packages.summary as summary
-import packages.test as test
-import packages.train as train
-import packages.utilis as utilis
+import packages.data as *
+import models.Net as *
+import packages.summary as *
+import packages.test as *
+import packages.train as *
+import packages.utilis as *
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 
