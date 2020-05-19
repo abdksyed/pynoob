@@ -1,0 +1,9 @@
+tqdm
+numpy
+matplotlib
+torch
+torchvision
+albumentations
+torch_lr_finder
+torchviz
+torchsummary

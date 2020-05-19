@@ -8,10 +8,10 @@ with open('requirements.txt', 'r') as fh:
 
 setuptools.setup(
     name="pynoob", # Replace with your own username
-    version="0.0.7",
+    version="0.0.1",
     author="Syed Abdul K",
     author_email="abdksyed@gmail.com",
-    description="A n00b DeepLearning Paclage",
+    description="A n00b DeepLearning Package",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/abksyed/pydeep",

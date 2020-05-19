@@ -1,0 +1,7 @@
+README.md
+setup.py
+pynoob.egg-info/PKG-INFO
+pynoob.egg-info/SOURCES.txt
+pynoob.egg-info/dependency_links.txt
+pynoob.egg-info/requires.txt
+pynoob.egg-info/top_level.txt
