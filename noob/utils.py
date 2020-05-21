@@ -15,7 +15,7 @@ class_correct = list(0. for i in range(10))
 class_total = list(0. for i in range(10))
 
 def model_summary(model):
-    """Displays the Summary of the Architecture - All the methods used adn the parameters used"""
+    """Displays the Summary of the Architecture - All the methods used and the parameters used"""
     summary(model, input_size=(3, 32, 32))
 
 def _test_mis(model, device, test_loader):
