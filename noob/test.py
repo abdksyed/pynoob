@@ -7,12 +7,13 @@ test_loss = []
 test_acc = []
 criterion = nn.CrossEntropyLoss()
 
-max = [0]
+max_val = 0
 
 def test(model, device, test_loader):
     model.eval()
     correct = 0
     tloss = 0
+    global max_val
 
     with torch.no_grad():
         for data, target in test_loader:
@@ -32,7 +33,7 @@ def test(model, device, test_loader):
 
     test_acc.append(100 * correct/len(test_loader.dataset))
 
-    if test_acc[-1] > max[0]:
-        max[0] = test_acc[-1]
-        path = '/content/classifier.pt'
+    if test_acc[-1] > max_val:
+        max_val = test_acc[-1]
+        path = '/classifier.pt'
         torch.save(model.state_dict(), path)

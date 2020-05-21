@@ -1,60 +1,69 @@
-import torch
-import torchvision
-from torchvision import datasets, transforms
+from torchvision import datasets
+from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
 
-cuda = torch.cuda.is_available()
+from augmentation import *
 
-# For Reproducibility
-torch.manual_seed(1)
+class MNISTDataLoader:
+    """
+    It creates a data loader for test and train. It taken transformations from the 'augmentation' module
+    """
+    def __init__(self, model_transform, data_dir= './root', batch_size=64, shuffle=True, nworkers=4, pin_memory=True):
+        self.data_dir = data_dir
 
-if cuda:
-    torch.cuda.manual_seed(1)
+        self.train_set = datasets.MNIST(
+            self.data_dir,
+            train=True,
+            download=True,
+            transform=model_transform.build_transforms(train=True)
+        )
 
-transform_train = transforms.Compose(
-    [transforms.RandomCrop(32, padding=4),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-transform = transforms.Compose(
-    [transforms.ToTensor(),
-     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        self.test_set = datasets.MNIST(
+            self.data_dir,
+            train=False,
+            download=True,
+            transform=model_transform.build_transforms(train=False)
+        )
 
-classes = ('plane', 'car', 'bird', 'cat',
-            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+        self.init_kwargs = {
+            'shuffle': shuffle,
+            'batch_size': batch_size,
+            'num_workers': nworkers,
+            'pin_memory': pin_memory
+        }
 
-def loader(batch_size= 64):
-    dataloader_args = dict(shuffle=True, batch_size=batch_size, num_workers=4,
-                            pin_memory=True) if cuda else dict(shuffle=True, batch_size=32)
+    def get_loaders(self):
+        return DataLoader(self.train_set, **self.init_kwargs), DataLoader(self.test_set, **self.init_kwargs)
 
-    train = torchvision.datasets.CIFAR10(root='./data', train=True,
-                                            download=True, transform=transform_train)
-    train_loader = torch.utils.data.DataLoader(train, **dataloader_args)
+class CIFAR10DataLoader:
 
-    test = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                        download=True, transform=transform)
-    test_loader = torch.utils.data.DataLoader(test, **dataloader_args)
+    class_names = ['airplane', 'automobile', 'bird', 'cat',
+                   'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
-    return train_loader, test_loader
+    def __init__(self, model_transform, data_dir= './root', batch_size=64, shuffle=True, nworkers=2, pin_memory=True):
+        self.data_dir = data_dir
 
-def _imshow(img):
-    img = img / 2 + 0.5     # unnormalize
-    npimg = img.numpy()
-    #print(npimg.shape)
-    #print(np.transpose(npimg, (1, 2, 0)).shape)
-    plt.figure()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+        self.train_set = datasets.CIFAR10(
+            self.data_dir,
+            train=True,
+            download=True,
+            transform=model_transform.build_transforms(train=True)
+        )
 
-def display(n= 64):
-    
-    train_loader, test_loader = loader()
+        self.test_set = datasets.CIFAR10(
+            self.data_dir,
+            train=False,
+            download=True,
+            transform=model_transform.build_transforms(train=False)
+        )
 
-    # get some random training images
-    dataiter = iter(train_loader)
-    images, labels = dataiter.next()
-    for i in range(0,n,int(np.sqrt(n))):
-        #print('the incoming image is ',images[i: i+int(np.sqrt(n))].shape)
-        _imshow(torchvision.utils.make_grid(images[i: i+int(np.sqrt(n))]))
-        # print labels
-        plt.title(' '.join('%7s' % classes[j] for j in labels[i: i+int(np.sqrt(n))]), loc= 'left')
+        self.init_kwargs = {
+            'shuffle': shuffle,
+            'batch_size': batch_size,
+            'num_workers': nworkers,
+            'pin_memory': pin_memory
+        }
+
+    def get_loaders(self):
+        return DataLoader(self.train_set, **self.init_kwargs), DataLoader(self.test_set, **self.init_kwargs)
