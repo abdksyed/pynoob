@@ -1,0 +1,7 @@
+README.md
+setup.py
+noob.egg-info/PKG-INFO
+noob.egg-info/SOURCES.txt
+noob.egg-info/dependency_links.txt
+noob.egg-info/requires.txt
+noob.egg-info/top_level.txt

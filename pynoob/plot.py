@@ -2,21 +2,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
-from torchsummary import summary
 import torchvision
-
-from test import test_loss, test_acc
-from train import train_loss, train_acc, train_endacc
-
-classes = ('plane', 'car', 'bird', 'cat',
-            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-
-class_correct = list(0. for i in range(10))
-class_total = list(0. for i in range(10))
-
-def model_summary(model):
-    """Displays the Summary of the Architecture - All the methods used and the parameters used"""
-    summary(model, input_size=(3, 32, 32))
 
 def _test_mis(model, device, test_loader):
     model.eval()
@@ -74,27 +60,32 @@ def mis(model, device, test_loader, nimage = 64):
         plt.xlabel(f'Ground Truth: {classes[tlab[index,0]]}')
         plt.tight_layout()
 
-def graph():
+def graph(train_obj, test_obj):
     """Display the Train Loss and Accuracy graph. Test Loss and Accuracy graph."""
     fig, axs = plt.subplots(2,2,figsize=(15,10))
-    axs[0, 0].plot(train_loss)
+    axs[0, 0].plot(train_obj.train_loss)
     axs[0, 0].set_title("Training Loss")
-    axs[1, 0].plot(train_acc)
+    axs[1, 0].plot(train_obj.train_acc)
     axs[1, 0].set_title("Training Accuracy")
-    axs[0, 1].plot(test_loss)
+    axs[0, 1].plot(test_obj.test_loss)
     axs[0, 1].set_title("Test Loss")
-    axs[1, 1].plot(test_acc)
+    axs[1, 1].plot(test_obj.test_acc)
     axs[1, 1].set_title("Test Accuracy")
 
-def testvtrain():
+def testvtrain(train_obj, test_obj):
     """Display Test vs Train Accuracy plot"""
     plt.axes(xlabel= 'epochs', ylabel= 'Accuracy')
-    plt.plot(train_endacc)
-    plt.plot(test_acc)
+    plt.plot(train_obj.train_endacc)
+    plt.plot(test_obj.test_acc)
     plt.title('Test vs Train Accuracy')
     plt.legend(['Train', 'Test'])
 
 def class_acc(model,device, test_loader):
+    classes = ('plane', 'car', 'bird', 'cat',
+            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+            
+    class_correct = list(0. for i in range(10))
+    class_total = list(0. for i in range(10))
 
     with torch.no_grad():
         for data, target in test_loader:
@@ -111,29 +102,3 @@ def class_acc(model,device, test_loader):
     for i in range(10):
         print('Accuracy of %5s : %2d %%' % (
             classes[i], 100 * class_correct[i] / class_total[i]))
-
-#To Display random pictures
-def unnorm(img, mean= (0.4914, 0.4822, 0.4465), std= (0.2023, 0.1994, 0.2010)):
-        for t, m, s in zip(img, mean, std):
-            t.mul_(s).add_(m)
-            # The normalize code -> t.sub_(m).div_(s)
-        return img
-
-def _imshow(img):
-    img = unnorm(img)      # unnormalize
-    npimg = img.numpy()
-    #print(npimg.shape)
-    #print(np.transpose(npimg, (1, 2, 0)).shape)
-    plt.figure()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
-
-def display(train_loader, n= 64,):
-
-    # get some random training images
-    dataiter = iter(train_loader)
-    images, labels = dataiter.next()
-    for i in range(0,n,int(np.sqrt(n))):
-        #print('the incoming image is ',images[i: i+int(np.sqrt(n))].shape)
-        _imshow(torchvision.utils.make_grid(images[i: i+int(np.sqrt(n))]))
-        # print labels
-        plt.title(' '.join('%7s' % classes[j] for j in labels[i: i+int(np.sqrt(n))]), loc= 'left')

@@ -5,6 +5,7 @@ from noob.Net import *
 from noob.summary import *
 from noob.test import *
 from noob.train import *
-from noob..utlis import *
+from noob.plot import *
+from noob.data_summary import *
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
