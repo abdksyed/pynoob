@@ -15,7 +15,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/abksyed/pynoob",
-    download_url = "https://github.com/abksyed/pynoob/dist/v0.0.12.tar.gz",
+    download_url = "https://github.com/abksyed/pynoob/dist/pynoob-0.0.12.tar.gz",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
