@@ -28,7 +28,6 @@ def display(train_loader, n= 64,):
     dataiter = iter(train_loader)
     images, labels = dataiter.next()
     for i in range(0,n,int(np.sqrt(n))):
-        #print('the incoming image is ',images[i: i+int(np.sqrt(n))].shape)
         _imshow(torchvision.utils.make_grid(images[i: i+int(np.sqrt(n))]))
         # print labels
         plt.title(' '.join('%7s' % classes[j] for j in labels[i: i+int(np.sqrt(n))]), loc= 'left')

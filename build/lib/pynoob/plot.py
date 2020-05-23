@@ -3,6 +3,10 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 import torchvision
+from torchvision import transforms
+
+classes = ('plane', 'car', 'bird', 'cat',
+            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 def _test_mis(model, device, test_loader):
     model.eval()
@@ -42,22 +46,24 @@ def mis(model, device, test_loader, nimage = 64):
     
     tlab, plab, img= _test_mis(model, device, test_loader)
 
-    x = img.cpu().numpy()
-    x = np.transpose(x, (0,2,3,1))
-    x = x/2 + 0.5
-    print(x.shape)
-
+    inv_norm = transforms.Normalize(
+        mean=(-0.4914/0.2023, -0.4822/0.1994, -0.4465/0.2010),
+        std=(1/0.2023, 1/0.1994, 1/0.2010))
+    print(img.shape)
+    
     figure = plt.figure()
-    num_of_images = nimage
     plt.figure(figsize=(16,16))
 
-    for index in range(0, num_of_images):
+    for index in range(0, nimage):
         plt.subplot(int(np.sqrt(nimage)), int(np.sqrt(nimage)), index+1)
         plt.xticks([])
         plt.yticks([])
-        plt.imshow(x[index].squeeze(), cmap='gray_r')
-        plt.title(f'Predicted: {classes[plab[index,0]]}')
-        plt.xlabel(f'Ground Truth: {classes[tlab[index,0]]}')
+        x = inv_norm(img[index])      # unnormalize
+        x = x.permute(1, 2, 0) # (C, M, N) -> (M, N, C)
+        x = x.cpu().numpy()
+        plt.imshow(x.squeeze(), cmap='gray_r')
+        plt.setp(plt.title(f'Predicted: {classes[plab[index,0]]}'), color= 'red')
+        plt.setp(plt.xlabel(f'Ground Truth: {classes[tlab[index,0]]}'), color= 'blue')
         plt.tight_layout()
 
 def graph(train_obj, test_obj):
@@ -80,10 +86,7 @@ def testvtrain(train_obj, test_obj):
     plt.title('Test vs Train Accuracy')
     plt.legend(['Train', 'Test'])
 
-def class_acc(model,device, test_loader):
-    classes = ('plane', 'car', 'bird', 'cat',
-            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-            
+def class_acc(model,device, test_loader):            
     class_correct = list(0. for i in range(10))
     class_total = list(0. for i in range(10))
 
