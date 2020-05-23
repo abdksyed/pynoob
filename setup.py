@@ -8,14 +8,14 @@ with open('requirements.txt', 'r') as fh:
 
 setuptools.setup(
     name="pynoob", # Replace with your own username
-    version="0.0.12",
+    version="0.0.13",
     author="Syed Abdul K",
     author_email="abdksyed@gmail.com",
     description="A n00b DeepLearning Package",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/abksyed/pynoob",
-    download_url = "https://github.com/abksyed/pynoob/dist/pynoob-0.0.12.tar.gz",
+    download_url = "https://github.com/abksyed/pynoob/dist/pynoob-0.0.13.tar.gz",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
