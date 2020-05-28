@@ -142,7 +142,7 @@ def class_acc(model,device, test_loader):
         print('Accuracy of %5s : %2d %%' % (
             classes[i], 100 * class_correct[i] / class_total[i]))
 
-def mis_grad(model, nimage=64):
+def mis_grad(model, nimage=64, overlay= 0.3):
   
   #############
   #Create directory for saving GradCAM images.
@@ -225,7 +225,7 @@ def mis_grad(model, nimage=64):
         heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
         heatmap = np.uint8(255 * heatmap)
         heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-        superimposed_img = heatmap * 0.2 + img
+        superimposed_img = heatmap * overlay + img
         map_path = '/content/map/map_' + str(index) + '.png'
         cv2.imwrite(map_path, superimposed_img)
 
