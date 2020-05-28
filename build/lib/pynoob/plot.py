@@ -159,7 +159,7 @@ def mis_grad(model, nimage=64):
   transform = transforms.Compose([
                                  transforms.ToTensor(),
                                  transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])])
-  dataset = ImageFolder(root='/content/img/', transform=transform)
+  dataset = ImageFolder(root='/content/mis_class/', transform=transform)
   dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1, shuffle=False)
 
   figure = plt.figure()
