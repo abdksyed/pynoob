@@ -90,7 +90,7 @@ def mis(model, device, test_loader, nimage = 64):
 
         ###########
         #To Save mis classified image for further use in GradCAM
-        path = '/content/img/mis/mis_' + str(index) + '.png'
+        path = '/content/mis_class/images/mis_' + str(index) + '.png'
         mis_img = Image.fromarray((x.squeeze() * 255).astype(np.uint8))
         mis_img.save(path)
         #########
@@ -220,7 +220,7 @@ def mis_grad(model, nimage=64):
         heatmap = heatmap.numpy()
 
         # interpolate the heatmap
-        cvpath = '/content/img/mis/mis_' + str(index) + '.png'
+        cvpath = '/content/mis_class/images/mis_' + str(index) + '.png'
         img = cv2.imread(cvpath)
         heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
         heatmap = np.uint8(255 * heatmap)
