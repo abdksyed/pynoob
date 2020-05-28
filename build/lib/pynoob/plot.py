@@ -4,9 +4,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torchvision
 from torchvision import transforms
+import os
+from PIL import Image
+import cv2
+from torchvision.datasets import ImageFolder
+
+from .grad_model import ResNet_Grad
 
 classes = ('plane', 'car', 'bird', 'cat',
             'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+pred_list= []
+true_list = []
 
 def _test_mis(model, device, test_loader):
     model.eval()
@@ -44,6 +52,24 @@ def _test_mis(model, device, test_loader):
 def mis(model, device, test_loader, nimage = 64):
     """Display the 'nimage' number of misclassified images."""
     
+    #############
+    #Create directory for saving misclassified images 
+    dirName = '/content/mis_class/'
+    subdir = '/content/mis_class/images'
+
+    # Create target Directory if don't exist
+    if not os.path.exists(dirName) and not os.path.exists(subdir):
+        os.mkdir(dirName)
+        os.mkdir(subdir)
+        print("Directory " , dirName ,  " Created ")
+        print("Directory " , subdir ,  " Created ")
+    elif not os.path.exists(subdir):
+        os.mkdir(subdir)
+        print("Directory " , subdir ,  " Created ")
+    else:
+        print("Directory " , dirName, 'and', subdir ,  " already exists")
+    ###############
+
     tlab, plab, img= _test_mis(model, device, test_loader)
 
     inv_norm = transforms.Normalize(
@@ -61,9 +87,19 @@ def mis(model, device, test_loader, nimage = 64):
         x = inv_norm(img[index])      # unnormalize
         x = x.permute(1, 2, 0) # (C, M, N) -> (M, N, C)
         x = x.cpu().numpy()
+
+        ###########
+        #To Save mis classified image for further use in GradCAM
+        path = '/content/img/mis/mis_' + str(index) + '.png'
+        mis_img = Image.fromarray((x.squeeze() * 255).astype(np.uint8))
+        mis_img.save(path)
+        #########
+
         plt.imshow(x.squeeze(), cmap='gray_r')
         plt.setp(plt.title(f'Predicted: {classes[plab[index,0]]}'), color= 'red')
+        pred_list.append(classes[plab[index,0]])
         plt.setp(plt.xlabel(f'Ground Truth: {classes[tlab[index,0]]}'), color= 'blue')
+        true_list.append(classes[tlab[index,0]])
         plt.tight_layout()
 
 def graph(train_obj, test_obj):
@@ -105,3 +141,101 @@ def class_acc(model,device, test_loader):
     for i in range(10):
         print('Accuracy of %5s : %2d %%' % (
             classes[i], 100 * class_correct[i] / class_total[i]))
+
+def mis_grad(model, nimage=64):
+  
+  #############
+  #Create directory for saving GradCAM images.
+  dirName = '/content/map/'
+
+  # Create target Directory if don't exist
+  if not os.path.exists(dirName):
+      os.mkdir(dirName)
+      print("Directory " , dirName ,  " Created ")
+  else:
+      print("Directory " , dirName , " already exists")
+  ###############
+
+  transform = transforms.Compose([
+                                 transforms.ToTensor(),
+                                 transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])])
+  dataset = ImageFolder(root='/content/img/', transform=transform)
+  dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+
+  figure = plt.figure()
+  plt.figure(figsize=(16,16))
+
+  for index in range(0, nimage):
+        plt.subplot(int(np.sqrt(nimage)), int(np.sqrt(nimage)), index+1)
+        plt.xticks([])
+        plt.yticks([])
+
+        #getting the image from loader
+        mis_img, _ = next(iter(dataloader))
+        mis_img = mis_img.to('cuda')
+        
+        # init the resnet
+        resnet = ResNet_Grad(model, mis_img)
+
+        # set the evaluation mode
+        _ = resnet.eval()
+
+
+        # forward pass
+        pred = resnet(mis_img)
+
+        prd_out = pred.argmax(dim=1) # prints tensor([2])
+        prd_out = prd_out.item()
+
+        # get the gradient of the output with respect to the parameters of the model
+        pred[:, prd_out].backward()
+
+        # pull the gradients out of the model
+        gradients = resnet.get_gradient()
+
+        # pool the gradients across the channels
+        pooled_gradients = torch.mean(gradients, dim=[0, 2, 3])
+
+        # get the activations of the last convolutional layer
+        activations = resnet.get_activations(mis_img).detach()
+
+        # weight the channels by corresponding gradients
+        for i in range(512):
+          activations[:, i, :, :] *= pooled_gradients[i]
+      
+        # average the channels of the activations
+        heatmap = torch.mean(activations, dim=1).squeeze()
+
+        # relu on top of the heatmap
+        # expression (2) in https://arxiv.org/pdf/1610.02391.pdf
+        heatmap = np.maximum(heatmap.cpu(), 0)
+
+        # normalize the heatmap
+        heatmap /= torch.max(heatmap)
+
+        # draw the heatmap
+        #plt.matshow(heatmap.squeeze())
+
+        # make the heatmap to be a numpy array
+        heatmap = heatmap.numpy()
+
+        # interpolate the heatmap
+        cvpath = '/content/img/mis/mis_' + str(index) + '.png'
+        img = cv2.imread(cvpath)
+        heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
+        heatmap = np.uint8(255 * heatmap)
+        heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+        superimposed_img = heatmap * 0.2 + img
+        map_path = '/content/map/map_' + str(index) + '.png'
+        cv2.imwrite(map_path, superimposed_img)
+
+  for index in range(0, 36):
+    plt.subplot(6, 6, index+1)
+    plt.xticks([])
+    plt.yticks([])
+    path = '/content/map/map_' + str(index) + '.png'
+    xa = plt.imread(path)
+    plt.imshow(xa.squeeze(), cmap='gray_r')
+    plt.setp(plt.title(f'Predicted: {pred_list[index]}'), color= 'red')
+    plt.setp(plt.xlabel(f'Ground Truth: {true_list[index]}'), color= 'blue')
+    plt.tight_layout()

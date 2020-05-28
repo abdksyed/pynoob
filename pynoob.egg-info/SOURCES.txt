@@ -5,6 +5,7 @@ pynoob/__init__.py
 pynoob/augmentation.py
 pynoob/data.py
 pynoob/data_summary.py
+pynoob/grad_model.py
 pynoob/plot.py
 pynoob/test.py
 pynoob/train.py
