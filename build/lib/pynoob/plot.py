@@ -8,14 +8,22 @@ import os
 from PIL import Image
 import cv2
 from torchvision.datasets import ImageFolder
+from torchvision.utils import save_image
 
-from .grad_model import ResNet_Grad
+from gradCAM import GradCAM
 
 classes = ('plane', 'car', 'bird', 'cat',
             'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 pred_list= []
 true_list = []
+device = 'cuda'
 
+def inv_norm(image):
+        inv_norm_transform = transforms.Normalize(
+        mean=(-0.4914/0.2023, -0.4822/0.1994, -0.4465/0.2010),
+        std=(1/0.2023, 1/0.1994, 1/0.2010))
+        return inv_norm_transform(image)
+    
 def _test_mis(model, device, test_loader):
     model.eval()
     correct = 0
@@ -72,12 +80,7 @@ def mis(model, device, test_loader, nimage = 64):
 
     tlab, plab, img= _test_mis(model, device, test_loader)
 
-    inv_norm = transforms.Normalize(
-        mean=(-0.4914/0.2023, -0.4822/0.1994, -0.4465/0.2010),
-        std=(1/0.2023, 1/0.1994, 1/0.2010))
     print(img.shape)
-    
-    figure = plt.figure()
     plt.figure(figsize=(16,16))
 
     for index in range(0, nimage):
@@ -90,12 +93,12 @@ def mis(model, device, test_loader, nimage = 64):
 
         ###########
         #To Save mis classified image for further use in GradCAM
-        path = '/content/mis_class/images/mis_' + str(index) + '.png'
+        path = f'/content/mis_class/images/mis_{index+10}.png'
         mis_img = Image.fromarray((x.squeeze() * 255).astype(np.uint8))
         mis_img.save(path)
         #########
 
-        plt.imshow(x.squeeze(), cmap='gray_r')
+        plt.imshow(x.squeeze(), cmap='gray_r', interpolation= 'bilinear')
         plt.setp(plt.title(f'Predicted: {classes[plab[index,0]]}'), color= 'red')
         pred_list.append(classes[plab[index,0]])
         plt.setp(plt.xlabel(f'Ground Truth: {classes[tlab[index,0]]}'), color= 'blue')
@@ -142,100 +145,174 @@ def class_acc(model,device, test_loader):
         print('Accuracy of %5s : %2d %%' % (
             classes[i], 100 * class_correct[i] / class_total[i]))
 
-def mis_grad(model, nimage=64, overlay= 0.3):
-  
-  #############
-  #Create directory for saving GradCAM images.
-  dirName = '/content/map/'
 
-  # Create target Directory if don't exist
-  if not os.path.exists(dirName):
-      os.mkdir(dirName)
-      print("Directory " , dirName ,  " Created ")
-  else:
-      print("Directory " , dirName , " already exists")
-  ###############
+def _visualize_cam(mask, img, hm_lay=0.5, img_lay=0.5, alpha=1.0):
+    """Make heatmap from mask and synthesize GradCAM result image using heatmap and img.
+    Args:
+        mask (torch.tensor): mask shape of (1, 1, H, W) and each element has value in range [0, 1]
+        img (torch.tensor): img shape of (1, 3, H, W) and each pixel value is in range [0, 1]
+    Return:
+        heatmap (torch.tensor): heatmap img shape of (3, H, W)
+        result (torch.tensor): synthesized GradCAM result of same shape with heatmap.
+    """
+    heatmap = (255 * mask.squeeze()).type(torch.uint8).cpu().numpy()
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    heatmap = torch.from_numpy(heatmap).permute(2, 0, 1).float().div(255)
+    b, g, r = heatmap.split(1)
+    heatmap = torch.cat([r, g, b]) * alpha
 
-  transform = transforms.Compose([
-                                 transforms.ToTensor(),
-                                 transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])])
-  dataset = ImageFolder(root='/content/mis_class/', transform=transform)
-  dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+    result = heatmap*hm_lay + img.cpu()*img_lay
+    result = result.div(result.max()).squeeze()
 
-  figure = plt.figure()
-  plt.figure(figsize=(16,16))
+    return heatmap, result
 
-  for index in range(0, nimage):
-        plt.subplot(int(np.sqrt(nimage)), int(np.sqrt(nimage)), index+1)
-        plt.xticks([])
-        plt.yticks([])
+def gen_cam(model, layer, class_idx= None):
+    
+    #############
+    #Create directory for saving GradCAM images.
 
-        #getting the image from loader
-        mis_img, _ = next(iter(dataloader))
-        mis_img = mis_img.to('cuda')
-        
-        # init the resnet
-        resnet = ResNet_Grad(model, mis_img)
+    # Create target Directory if don't exist
+    if class_idx is None:
+        dirName = '/content/result_pred/'
+        dir2Name = '/content/heatmap_pred/'
+        if not os.path.exists(dirName) or not os.path.exists(dirName):
+            os.mkdir(dirName)
+            os.mkdir(dir2Name)
+            print("Directory " , dirName ,  " Created ")
+            print("Directory " , dir2Name ,  " Created ")
+        else:
+            print("Directory " , dirName , " already exists")
+            print("Directory " , dir2Name , " already exists")
+    else:
+        dirName = '/content/result_act/'
+        dir2Name = '/content/heatmap_act/'
+        if not os.path.exists(dirName) or not os.path.exists(dirName):
+            os.mkdir(dirName)
+            os.mkdir(dir2Name)
+            print("Directory " , dirName ,  " Created ")
+            print("Directory " , dir2Name ,  " Created ")
+        else:
+            print("Directory " , dirName , " already exists")
+            print("Directory " , dir2Name , " already exists")
+    
+    model_layer = getattr(model, layer)
+    gradcam = GradCAM(model, model_layer)
+    
+    transform = transforms.Compose([
+                                    transforms.ToTensor(),
+                                    transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])])
+    dataset = ImageFolder(root='/content/mis_class/', transform=transform)
+    dataloader = torch.utils.data.DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+    
+    for index, batch in enumerate(dataloader):
+      normed_torch_img, _ = batch
 
-        # set the evaluation mode
-        _ = resnet.eval()
+      torch_img = inv_norm(normed_torch_img[0])
+      if class_idx is None:
+          class_idx_ = None
+      else:
+          class_idx_ = classes.index(class_idx[index])
+      mask, _ = gradcam(normed_torch_img.to(device), class_idx = class_idx_)
+      heatmap, result = _visualize_cam(mask, torch_img)
+      if class_idx is None:
+        fp_path_heat = f'/content/heatmap_pred/map{index+10}_{layer}.png'
+        save_image(heatmap, fp=fp_path_heat)
+        fp_path_res = f'/content/result_pred/result{index+10}_{layer}.png'
+        save_image(result, fp=fp_path_res)
+      else:
+        fp_path_heat = f'/content/heatmap_act/map{index+10}_{layer}.png'
+        save_image(heatmap, fp=fp_path_heat)
+        fp_path_res = f'/content/result_act/result{index+10}_{layer}.png'
+        save_image(result, fp=fp_path_res)
 
+def plot_pred_cam(n,l):
+  fig, axes = plt.subplots(n, l+2, figsize=((l+2)*3,n*2.5))
+  fig.suptitle("Grad-CAM of Mis Classified Images with respect to Predicted(wrong) Class", fontsize=20)
+  for index in range(0, n):
+      # plt.subplot(n, l+1, index+1)
+      plt.xticks([])
+      plt.yticks([])
+      axes[index, 0].text(0.5, 0.5, f'Predicted {pred_list[index]} \n Actual: {true_list[index]}', fontsize= 16)
+      axes[index, 0].axis('off')
+      path = '/content/mis_class/images/mis_' + str(index+10) + '.png'
+      img = plt.imread(path)
+      axes[index, 1].imshow(img, interpolation= 'bilinear')
+      axes[index, 1].axis('off')
+      for layer in range(l):
+        path = f'/content/result_pred/result{index+10}_layer{layer+1}.png'
+        img = plt.imread(path)
+        axes[index, layer+2].imshow(img.squeeze(), cmap='gray_r', interpolation= 'bilinear')
+        axes[index, layer+2].set_title(f'Later: {layer+1}')
+        axes[index, layer+2].axis('off')
+  plt.tight_layout()
+  plt.subplots_adjust(top=0.97)
+  plt.show()
 
-        # forward pass
-        pred = resnet(mis_img)
+def plot_act_cam(n,l):
+  fig, axes = plt.subplots(n, l+2, figsize=((l+2)*3,n*2.5))
+  fig.suptitle("Grad-CAM of Mis Classified Images with respect to Actual(correct) Class", fontsize=20)
+  for index in range(0, n):
+      # plt.subplot(n, l+1, index+1)
+      plt.xticks([])
+      plt.yticks([])
+      axes[index, 0].text(0.5, 0.5, f'Predicted {pred_list[index]} \n Actual: {true_list[index]}', fontsize= 16)
+      axes[index, 0].axis('off')
+      path = '/content/mis_class/images/mis_' + str(index+10) + '.png'
+      img = plt.imread(path)
+      axes[index, 1].imshow(img, interpolation= 'bilinear')
+      axes[index, 1].axis('off')
+      for layer in range(l):
+        path = f'/content/result_act/result{index+10}_layer{layer+1}.png'
+        img = plt.imread(path)
+        axes[index, layer+2].imshow(img.squeeze(), cmap='gray_r', interpolation= 'bilinear')
+        axes[index, layer+2].set_title(f'Later: {layer+1}')
+        axes[index, layer+2].axis('off')
+  plt.tight_layout()
+  plt.subplots_adjust(top=0.97)
+  plt.show()
 
-        prd_out = pred.argmax(dim=1) # prints tensor([2])
-        prd_out = prd_out.item()
+def plot_pred_heatmap(n,l):
+  fig, axes = plt.subplots(n, l+2, figsize=((l+2)*3,n*2.5))
+  fig.suptitle("Grad-CAM - Heatmap of Mis Classified Images with respect to Predicted(wrong) Class", fontsize=20)
+  for index in range(0, n):
+      # plt.subplot(n, l+1, index+1)
+      plt.xticks([])
+      plt.yticks([])
+      axes[index, 0].text(0.5, 0.5, f'Predicted {pred_list[index]} \n Actual: {true_list[index]}', fontsize= 16)
+      axes[index, 0].axis('off')
+      path = '/content/mis_class/images/mis_' + str(index+10) + '.png'
+      img = plt.imread(path)
+      axes[index, 1].imshow(img, interpolation= 'bilinear')
+      axes[index, 1].axis('off')
+      for layer in range(l):
+        path = f'/content/heatmap_pred/heatmap{index+10}_layer{layer+1}.png'
+        img = plt.imread(path)
+        axes[index, layer+2].imshow(img.squeeze(), cmap='gray_r', interpolation= 'bilinear')
+        axes[index, layer+2].set_title(f'Later: {layer+1}')
+        axes[index, layer+2].axis('off')
+  plt.tight_layout()
+  plt.subplots_adjust(top=0.97)
+  plt.show()
 
-        # get the gradient of the output with respect to the parameters of the model
-        pred[:, prd_out].backward()
-
-        # pull the gradients out of the model
-        gradients = resnet.get_gradient()
-
-        # pool the gradients across the channels
-        pooled_gradients = torch.mean(gradients, dim=[0, 2, 3])
-
-        # get the activations of the last convolutional layer
-        activations = resnet.get_activations(mis_img).detach()
-
-        # weight the channels by corresponding gradients
-        for i in range(512):
-          activations[:, i, :, :] *= pooled_gradients[i]
-      
-        # average the channels of the activations
-        heatmap = torch.mean(activations, dim=1).squeeze()
-
-        # relu on top of the heatmap
-        # expression (2) in https://arxiv.org/pdf/1610.02391.pdf
-        heatmap = np.maximum(heatmap.cpu(), 0)
-
-        # normalize the heatmap
-        heatmap /= torch.max(heatmap)
-
-        # draw the heatmap
-        #plt.matshow(heatmap.squeeze())
-
-        # make the heatmap to be a numpy array
-        heatmap = heatmap.numpy()
-
-        # interpolate the heatmap
-        cvpath = '/content/mis_class/images/mis_' + str(index) + '.png'
-        img = cv2.imread(cvpath)
-        heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
-        heatmap = np.uint8(255 * heatmap)
-        heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-        superimposed_img = heatmap * overlay + img
-        map_path = '/content/map/map_' + str(index) + '.png'
-        cv2.imwrite(map_path, superimposed_img)
-
-  for index in range(0, 36):
-    plt.subplot(6, 6, index+1)
-    plt.xticks([])
-    plt.yticks([])
-    path = '/content/map/map_' + str(index) + '.png'
-    xa = plt.imread(path)
-    plt.imshow(xa.squeeze(), cmap='gray_r')
-    plt.setp(plt.title(f'Predicted: {pred_list[index]}'), color= 'red')
-    plt.setp(plt.xlabel(f'Ground Truth: {true_list[index]}'), color= 'blue')
-    plt.tight_layout()
+def plot_act_heatmap(n,l):
+  fig, axes = plt.subplots(n, l+2, figsize=((l+2)*3,n*2.5))
+  fig.suptitle("Grad-CAM - Heatmap of Mis Classified Images with respect to Actual(correct) Class", fontsize=20)
+  for index in range(0, n):
+      # plt.subplot(n, l+1, index+1)
+      plt.xticks([])
+      plt.yticks([])
+      axes[index, 0].text(0.5, 0.5, f'Predicted {pred_list[index]} \n Actual: {true_list[index]}', fontsize= 16)
+      axes[index, 0].axis('off')
+      path = '/content/mis_class/images/mis_' + str(index+10) + '.png'
+      img = plt.imread(path)
+      axes[index, 1].imshow(img, interpolation= 'bilinear')
+      axes[index, 1].axis('off')
+      for layer in range(l):
+        path = f'/content/heatmap_act/heatmap{index+10}_layer{layer+1}.png'
+        img = plt.imread(path)
+        axes[index, layer+2].imshow(img.squeeze(), cmap='gray_r', interpolation= 'bilinear')
+        axes[index, layer+2].set_title(f'Later: {layer+1}')
+        axes[index, layer+2].axis('off')
+  plt.tight_layout()
+  plt.subplots_adjust(top=0.97)
+  plt.show()

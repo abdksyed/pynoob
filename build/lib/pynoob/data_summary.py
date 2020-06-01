@@ -20,7 +20,7 @@ def _imshow(img):
     img = inv_norm(img)      # unnormalize
     npimg = img.numpy()
     plt.figure()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.imshow(np.transpose(npimg, (1, 2, 0)), interpolation= 'bilinear')
 
 def display(train_loader, n= 64,):
 

@@ -1,11 +1,10 @@
 README.md
 setup.py
-pynoob/Net.py
 pynoob/__init__.py
 pynoob/augmentation.py
 pynoob/data.py
 pynoob/data_summary.py
-pynoob/grad_model.py
+pynoob/gradCAM.py
 pynoob/plot.py
 pynoob/test.py
 pynoob/train.py
@@ -14,3 +13,6 @@ pynoob.egg-info/SOURCES.txt
 pynoob.egg-info/dependency_links.txt
 pynoob.egg-info/requires.txt
 pynoob.egg-info/top_level.txt
+pynoob/models/CusResNet.py
+pynoob/models/Net.py
+pynoob/models/__init__.py
