@@ -3,13 +3,13 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .augmentation import *
+from .augmentation import MNIST_Transforms, CIFAR10_Transforms, CIFAR10_AlbumTrans
 
 class MNISTDataLoader:
     """
     It creates a data loader for test and train. It taken transformations from the 'augmentation' module
     """
-    def __init__(self, model_transform, data_dir= './root', batch_size=64, shuffle=True, nworkers=4, pin_memory=True):
+    def __init__(self, model_transform, batch_size=64, data_dir= './root', shuffle=True, nworkers=4, pin_memory=True):
         self.data_dir = data_dir
 
         self.train_set = datasets.MNIST(
@@ -41,7 +41,7 @@ class CIFAR10DataLoader:
     class_names = ['airplane', 'automobile', 'bird', 'cat',
                    'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
-    def __init__(self, model_transform, data_dir= './root', batch_size=64, shuffle=True, nworkers=4, pin_memory=True):
+    def __init__(self, model_transform, batch_size=64, data_dir= './root', shuffle=True, nworkers=4, pin_memory=True):
         self.data_dir = data_dir
 
         self.train_set = datasets.CIFAR10(

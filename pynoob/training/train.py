@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 class Train:
-    def __init__(self, model, device, train_loader, optimizer):
+    def __init__(self, model, device, train_loader, optimizer, criterion):
         
         self.model = model
         self.device = device
@@ -15,7 +15,7 @@ class Train:
 
         self.train_acc = []
         self.train_endacc = []
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = criterion
 
     def train(self, epoch):
         self.model.train()

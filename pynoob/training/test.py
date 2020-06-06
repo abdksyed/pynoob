@@ -3,14 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class Test:
-    def __init__(self, model, device, test_loader):
+    def __init__(self, model, device, test_loader, criterion):
         self.model = model
         self.device = device
         self.test_loader = test_loader
 
         self.test_loss = []
         self.test_acc = []
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = criterion
         self.max_val = 0
 
     def test(self):

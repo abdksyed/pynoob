@@ -126,7 +126,7 @@ def _visualize_cam(mask, img, hm_lay=0.5, img_lay=0.5, alpha=1.0):
 
     return heatmap, result
 
-def gen_cam(model, layer, class_idx= None):
+def gen_cam(model, layer, class_idx= None, hm_lay= 0.5, img_lay= 0.5):
     
     #############
     #Create directory for saving GradCAM images.
@@ -173,7 +173,7 @@ def gen_cam(model, layer, class_idx= None):
       else:
           class_idx_ = classes.index(class_idx[index])
       mask, _ = gradcam(normed_torch_img.to(device), class_idx = class_idx_)
-      heatmap, result = _visualize_cam(mask, torch_img)
+      heatmap, result = _visualize_cam(mask, torch_img, hm_lay, img_lay)
       if class_idx is None:
         fp_path_heat = f'/content/heatmap_pred/map{index+10}_{layer}.png'
         save_image(heatmap, fp=fp_path_heat)

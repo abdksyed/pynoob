@@ -10,19 +10,20 @@ import cv2
 from torchvision.datasets import ImageFolder
 from torchvision.utils import save_image
 
-from gradCAM import GradCAM
+from .gradCAM import GradCAM
 
 classes = ('plane', 'car', 'bird', 'cat',
             'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+
 pred_list= []
 true_list = []
 device = 'cuda'
 
 def inv_norm(image):
-        inv_norm_transform = transforms.Normalize(
+    inv_norm_transform = transforms.Normalize(
         mean=(-0.4914/0.2023, -0.4822/0.1994, -0.4465/0.2010),
         std=(1/0.2023, 1/0.1994, 1/0.2010))
-        return inv_norm_transform(image)
+    return inv_norm_transform(image)
     
 def _test_mis(model, device, test_loader):
     model.eval()
@@ -52,9 +53,9 @@ def _test_mis(model, device, test_loader):
 
     tloss /= len(test_loader.dataset)
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
-          tloss, correct, len(test_loader.dataset),
-          100 * correct/len(test_loader.dataset)))
-          
+            tloss, correct, len(test_loader.dataset),
+            100 * correct/len(test_loader.dataset)))
+            
     return true_label, pred_label, misclass_image
 
 def mis(model, device, test_loader, nimage = 64):
@@ -105,47 +106,6 @@ def mis(model, device, test_loader, nimage = 64):
         true_list.append(classes[tlab[index,0]])
         plt.tight_layout()
 
-def graph(train_obj, test_obj):
-    """Display the Train Loss and Accuracy graph. Test Loss and Accuracy graph."""
-    fig, axs = plt.subplots(2,2,figsize=(15,10))
-    axs[0, 0].plot(train_obj.train_loss)
-    axs[0, 0].set_title("Training Loss")
-    axs[1, 0].plot(train_obj.train_acc)
-    axs[1, 0].set_title("Training Accuracy")
-    axs[0, 1].plot(test_obj.test_loss)
-    axs[0, 1].set_title("Test Loss")
-    axs[1, 1].plot(test_obj.test_acc)
-    axs[1, 1].set_title("Test Accuracy")
-
-def testvtrain(train_obj, test_obj):
-    """Display Test vs Train Accuracy plot"""
-    plt.axes(xlabel= 'epochs', ylabel= 'Accuracy')
-    plt.plot(train_obj.train_endacc)
-    plt.plot(test_obj.test_acc)
-    plt.title('Test vs Train Accuracy')
-    plt.legend(['Train', 'Test'])
-
-def class_acc(model,device, test_loader):            
-    class_correct = list(0. for i in range(10))
-    class_total = list(0. for i in range(10))
-
-    with torch.no_grad():
-        for data, target in test_loader:
-            images, labels = data.to(device), target.to(device)
-            outputs = model(images)
-            _, predicted = torch.max(outputs, 1)
-            c = (predicted == labels).squeeze()
-            for i in range(labels.shape[0]):
-                label = labels[i]
-                class_correct[label] += c[i].item()
-                class_total[label] += 1
-
-
-    for i in range(10):
-        print('Accuracy of %5s : %2d %%' % (
-            classes[i], 100 * class_correct[i] / class_total[i]))
-
-
 def _visualize_cam(mask, img, hm_lay=0.5, img_lay=0.5, alpha=1.0):
     """Make heatmap from mask and synthesize GradCAM result image using heatmap and img.
     Args:
@@ -166,7 +126,7 @@ def _visualize_cam(mask, img, hm_lay=0.5, img_lay=0.5, alpha=1.0):
 
     return heatmap, result
 
-def gen_cam(model, layer, class_idx= None):
+def gen_cam(model, layer, class_idx= None, hm_lay= 0.5, img_lay= 0.5):
     
     #############
     #Create directory for saving GradCAM images.
@@ -197,7 +157,7 @@ def gen_cam(model, layer, class_idx= None):
     
     model_layer = getattr(model, layer)
     gradcam = GradCAM(model, model_layer)
-    
+
     transform = transforms.Compose([
                                     transforms.ToTensor(),
                                     transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010])])
@@ -213,7 +173,7 @@ def gen_cam(model, layer, class_idx= None):
       else:
           class_idx_ = classes.index(class_idx[index])
       mask, _ = gradcam(normed_torch_img.to(device), class_idx = class_idx_)
-      heatmap, result = _visualize_cam(mask, torch_img)
+      heatmap, result = _visualize_cam(mask, torch_img, hm_lay, img_lay)
       if class_idx is None:
         fp_path_heat = f'/content/heatmap_pred/map{index+10}_{layer}.png'
         save_image(heatmap, fp=fp_path_heat)
