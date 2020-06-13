@@ -67,11 +67,15 @@ class Sara():
             ax[0].plot(lr[i][10:-5], loss[i][10:-5], label=str(weight_decays[i]))
         ax[0].set_xscale('log')
         ax[0].legend(loc='upper left')
+        ax[0].set_xlabel("Learning rate")
+        ax[0].set_ylabel("Loss")
 
         for i in range(len(weight_decays)):
             ax[1].plot(lr[i][10:-5], acc[i][10:-5], label=str(weight_decays[i]))
         ax[1].set_xscale('log')
         ax[1].legend(loc='upper left')
+        ax[1].set_xlabel("Learning rate")
+        ax[1].set_ylabel("Accuracy")
 
 
     def fit(self, train_loader, test_loader, epochs= 10, scheduler={'name':None}, lr=0.01, weight_decay= 0, plot_lr= False):
