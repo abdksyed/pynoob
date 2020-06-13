@@ -1,5 +1,6 @@
 README.md
 setup.py
+pynoob/Newton.py
 pynoob/__init__.py
 pynoob.egg-info/PKG-INFO
 pynoob.egg-info/SOURCES.txt
@@ -12,6 +13,7 @@ pynoob/load_data/data.py
 pynoob/load_data/data_summary.py
 pynoob/models/CusResNet.py
 pynoob/models/Net.py
+pynoob/models/S11_model.py
 pynoob/models/__init__.py
 pynoob/plotting/__init__.py
 pynoob/plotting/gradCAM.py

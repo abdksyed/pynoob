@@ -11,13 +11,14 @@ class Train:
         self.train_loader = train_loader
         self.optimizer = optimizer
 
+
         self.train_loss = []
 
         self.train_acc = []
         self.train_endacc = []
         self.criterion = criterion
 
-    def train(self, epoch):
+    def train(self, scheduler= None):
         self.model.train()
         pbar = tqdm(self.train_loader)
         correct = 0
@@ -39,6 +40,9 @@ class Train:
             pred = y_pred.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
             processed += len(data)
+
+            if scheduler is not None:
+                scheduler.step()
 
             pbar.set_description(
                 desc=f'Loss={loss.item()} Batch_id={batch_idx} Accuracy={100*correct/processed:0.2f}')

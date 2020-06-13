@@ -124,10 +124,14 @@ class LRFinder(object):
 
         self.model = model
         self.criterion = criterion
-        self.history = {"lr": [], "loss": []}
+        self.history = {"lr": [], "loss": [], 'acc': [], 'raw_loss': []}
         self.best_loss = None
+        self.best_acc = None
         self.memory_cache = memory_cache
         self.cache_dir = cache_dir
+
+        self.lr_for_minloss = None
+        self.lr_for_maxacc = None
 
         # Save the original state of the model and optimizer so they can be restored if
         # needed
@@ -228,8 +232,9 @@ class LRFinder(object):
         """
 
         # Reset test results
-        self.history = {"lr": [], "loss": []}
+        self.history = {"lr": [], "loss": [], "acc": [], 'raw_loss': []}
         self.best_loss = None
+        self.best_acc = None
 
         # Move the model to the proper device
         self.model.to(self.device)
@@ -274,13 +279,13 @@ class LRFinder(object):
 
         for iteration in tqdm(range(num_iter)):
             # Train on batch and retrieve loss
-            loss = self._train_batch(
+            loss, acc = self._train_batch(
                 train_iter,
                 accumulation_steps,
                 non_blocking_transfer=non_blocking_transfer,
             )
             if val_loader:
-                loss = self._validate(
+                loss, acc = self._validate(
                     val_iter, non_blocking_transfer=non_blocking_transfer
                 )
 
@@ -288,21 +293,34 @@ class LRFinder(object):
             self.history["lr"].append(lr_schedule.get_lr()[0])
             lr_schedule.step()
 
+            rloss = loss
+
             # Track the best loss and smooth it if smooth_f is specified
             if iteration == 0:
                 self.best_loss = loss
+                self.best_acc = acc
+                
             else:
                 if smooth_f > 0:
                     loss = smooth_f * loss + (1 - smooth_f) * self.history["loss"][-1]
                 if loss < self.best_loss:
                     self.best_loss = loss
+                if acc > self.best_acc:
+                    self.best_acc = acc
 
             # Check if the loss has diverged; if it has, stop the test
             self.history["loss"].append(loss)
+            self.history["acc"].append(acc)
+            self.history["raw_loss"].append(rloss)
             if loss > diverge_th * self.best_loss:
                 print("Stopping early, the loss has diverged")
                 break
 
+        self.lr_for_minloss = self.history['lr'][self.history['loss'].index(self.best_loss)]
+        self.lr_for_maxacc = self.history['lr'][self.history['acc'].index(self.best_acc)]
+        
+        print(f"Learnign Rate for least Loss {self.best_loss} : {self.lr_for_minloss}")
+        print(f"Learnign Rate for highest Accuracy {self.best_acc} : {self.lr_for_maxacc}")
         print("Learning rate search finished. See the graph with {finder_name}.plot()")
 
     def _set_learning_rate(self, new_lrs):
@@ -326,6 +344,7 @@ class LRFinder(object):
         self, train_iter, accumulation_steps, non_blocking_transfer=True
     ):
         self.model.train()
+        correct = 0
         total_loss = None  # for late initialization
 
         self.optimizer.zero_grad()
@@ -338,6 +357,9 @@ class LRFinder(object):
             # Forward pass
             outputs = self.model(inputs)
             loss = self.criterion(outputs, labels)
+
+            pred = outputs.argmax(dim=1, keepdim=True)
+            correct = pred.eq(labels.view_as(pred)).sum().item()
 
             # Loss should be averaged in each step
             loss /= accumulation_steps
@@ -362,7 +384,7 @@ class LRFinder(object):
 
         self.optimizer.step()
 
-        return total_loss.item()
+        return total_loss.item(), 100*correct/len(inputs)
 
     def _move_to_device(self, inputs, labels, non_blocking=True):
         def move(obj, device, non_blocking=True):
@@ -384,6 +406,7 @@ class LRFinder(object):
     def _validate(self, val_iter, non_blocking_transfer=True):
         # Set model to evaluation mode and disable gradient computation
         running_loss = 0
+        correct=0
         self.model.eval()
         with torch.no_grad():
             for inputs, labels in val_iter:
@@ -402,7 +425,10 @@ class LRFinder(object):
                 loss = self.criterion(outputs, labels)
                 running_loss += loss.item() * batch_size
 
-        return running_loss / len(val_iter.dataset)
+                pred = outputs.argmax(dim=1, keepdim=True)
+                correct += pred.eq(labels.view_as(pred)).sum().item()
+
+        return running_loss / len(val_iter.dataset), 100 * correct/len(val_iter.dataset)
 
     def plot(self, skip_start=10, skip_end=5, log_lr=True, show_lr=None, ax=None):
         """Plots the learning rate range test.
@@ -434,31 +460,42 @@ class LRFinder(object):
         # properly so the behaviour is the expected
         lrs = self.history["lr"]
         losses = self.history["loss"]
+        acc = self.history["acc"]
         if skip_end == 0:
             lrs = lrs[skip_start:]
             losses = losses[skip_start:]
         else:
             lrs = lrs[skip_start:-skip_end]
             losses = losses[skip_start:-skip_end]
+            acc = acc[skip_start:-skip_end]
 
         # Create the figure and axes object if axes was not already given
-        fig = None
-        if ax is None:
-            fig, ax = plt.subplots()
+        #fig = plt.subplot(1,2)
+        # if ax is None:
+        #     fig, ax = plt.subplots(1,2)
 
         # Plot loss as a function of the learning rate
-        ax.plot(lrs, losses)
+        plt.subplot(1,2,2)
+        plt.plot(lrs, losses)
         if log_lr:
-            ax.set_xscale("log")
-        ax.set_xlabel("Learning rate")
-        ax.set_ylabel("Loss")
+            plt.xscale("log")
+        plt.xlabel("Learning rate")
+        plt.ylabel("Loss")
 
-        if show_lr is not None:
-            ax.axvline(x=show_lr, color="red")
+        # if show_lr is not None:
+        #     ax.axvline(x=show_lr, color="red")
+
+        # Plot accuracy as a function of the learning rate
+        plt.subplot(1,2,1)
+        plt.subplots_adjust(right= 1.5)
+        plt.plot(lrs, acc)
+        if log_lr:
+            plt.xscale("log")
+        plt.xlabel("Learning rate")
+        plt.ylabel("Accuracy")
 
         # Show only if the figure was created internally
-        if fig is not None:
-            plt.show()
+        plt.show()
 
         return ax
 

@@ -1,5 +1,6 @@
 import abc
 
+import cv2
 import torchvision.transforms as T
 import albumentations as alb
 from albumentations.pytorch import ToTensor
@@ -60,11 +61,12 @@ class CIFAR10_AlbumTrans(AugmentationBase):
 
     def build_train(self):
         train_trans = alb.Compose([
-            alb.Rotate((-7.0, 7.0)),
+            #alb.Rotate((-7.0, 7.0)),
+            alb.PadIfNeeded(40,40,cv2.BORDER_CONSTANT,[4,4],0),
             #alb.Cutout(1,16,16, [0.4914, 0.4822, 0.4465]*255),
-            alb.CoarseDropout(1, 16, 16, fill_value= [0.4914*255, 0.4822*255, 0.4465*255]),
-            #alb.RandomCrop(224,224),
+            alb.RandomCrop(32,32),
             alb.HorizontalFlip(),
+            alb.CoarseDropout(1, 8, 8, fill_value= [0.4914*255, 0.4822*255, 0.4465*255]),
             alb.Normalize(
                 mean=[0.4914, 0.4822, 0.4465],
                 std=[0.2023, 0.1994, 0.2010]

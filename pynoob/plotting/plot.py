@@ -9,6 +9,7 @@ from PIL import Image
 import cv2
 from torchvision.datasets import ImageFolder
 from torchvision.utils import save_image
+from math import floor
 
 from .gradCAM import GradCAM
 
@@ -75,8 +76,8 @@ def mis(model, device, test_loader, nimage = 64):
     elif not os.path.exists(subdir):
         os.mkdir(subdir)
         print("Directory " , subdir ,  " Created ")
-    else:
-        print("Directory " , dirName, 'and', subdir ,  " already exists")
+    #else:
+        #print("Directory " , dirName, 'and', subdir ,  " already exists")
     ###############
 
     tlab, plab, img= _test_mis(model, device, test_loader)
@@ -140,9 +141,9 @@ def gen_cam(model, layer, class_idx= None, hm_lay= 0.5, img_lay= 0.5):
             os.mkdir(dir2Name)
             print("Directory " , dirName ,  " Created ")
             print("Directory " , dir2Name ,  " Created ")
-        else:
-            print("Directory " , dirName , " already exists")
-            print("Directory " , dir2Name , " already exists")
+        #else:
+            #print("Directory " , dirName , " already exists")
+            #print("Directory " , dir2Name , " already exists")
     else:
         dirName = '/content/result_act/'
         dir2Name = '/content/heatmap_act/'
@@ -151,9 +152,9 @@ def gen_cam(model, layer, class_idx= None, hm_lay= 0.5, img_lay= 0.5):
             os.mkdir(dir2Name)
             print("Directory " , dirName ,  " Created ")
             print("Directory " , dir2Name ,  " Created ")
-        else:
-            print("Directory " , dirName , " already exists")
-            print("Directory " , dir2Name , " already exists")
+        #else:
+           #print("Directory " , dirName , " already exists")
+           #print("Directory " , dir2Name , " already exists")
     
     model_layer = getattr(model, layer)
     gradcam = GradCAM(model, model_layer)
@@ -276,3 +277,25 @@ def plot_act_heatmap(n,l):
   plt.tight_layout()
   plt.subplots_adjust(top=0.97)
   plt.show()
+
+
+def plot_cycle(no_cycle, loader, step_size=None, min_lr= 0.0001, max_lr = 10):
+
+  if step_size is None:
+    step_size = 8*len(loader)
+
+  total_iter = no_cycle*(2*step_size)
+
+  lr_list = [min_lr]
+
+  for i in range(1, total_iter+1):
+    cycle = floor(1 + i/(2*step_size))
+    x = abs((i/step_size) - (2*cycle) + 1)
+    curr_lr = min_lr + (max_lr - min_lr)*(1-x)
+    lr_list.append(curr_lr)
+
+  plt.figure(figsize= (no_cycle, 3))
+  plt.plot(lr_list)
+  plt.title('Cyclic Learning Rate')
+  plt.xlabel('Iterations')
+  plt.ylabel('Learning Rate')
