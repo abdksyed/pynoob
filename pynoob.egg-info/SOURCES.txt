@@ -11,8 +11,10 @@ pynoob/load_data/__init__.py
 pynoob/load_data/augmentation.py
 pynoob/load_data/data.py
 pynoob/load_data/data_summary.py
+pynoob/load_data/datasets.py
 pynoob/models/CusResNet.py
 pynoob/models/Net.py
+pynoob/models/ResNet_S12.py
 pynoob/models/S11_model.py
 pynoob/models/__init__.py
 pynoob/plotting/__init__.py

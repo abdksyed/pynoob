@@ -19,16 +19,22 @@ class Sara():
         self.lr_variations = []
         self.best_model = None
 
-    def loaders(self, trans=CIFAR10_AlbumTrans, aug= None, dataset= CIFAR10DataLoader, batch_size= 128):
+    def loaders(self, trans=CIFAR10_AlbumTrans, aug= None, dataset= CIFAR10DataLoader, batch_size= 128, split=None):
         transformation = trans(augs= aug)
-        self.data = dataset(transformation, batch_size)
+        self.split = split
+
+        if self.split:
+            self.data = dataset(transformation, batch_size, split= self.split)
+        else:
+            self.data = dataset(transformation, batch_size)
+
         return self.data.get_loaders() 
 
-    def display_samples(self, loader, n):
-        return display(loader, n)
+    def display_samples(self, loader, n, dataset_used):
+        return display(loader, n, dataset_used)
 
-    def model(self):
-        return self.model_name, model_summary(self.model_name)
+    def model(self, input_size= (3,32,23)):
+        return self.model_name, model_summary(self.model_name, input_size=input_size)
     
     def find_lr(self, loader, min_lr=1e-7, end_lr=100, num_iter= 100, momentum= 0.9, weight_decay= 0,
                 nesterov= False, step_mode= 'exp', log_lr= True, best_lr_from = 'loss'):
@@ -92,8 +98,10 @@ class Sara():
         else:
             self.best_lr = start_lr
 
-    def fit(self, train_loader, test_loader, epochs= 10, scheduler={'name':None}, lr=0.01, momentum=0.9, weight_decay= 0, plot_lr= False):
+    def fit(self, train_loader, test_loader, val_loader=None, epochs= 10, scheduler={'name':None}, lr=0.01, momentum=0.9, weight_decay= 0, plot_lr= False):
         
+        self.val_loader = val_loader
+
         if self.best_lr is None:
             self.best_lr = lr
         
@@ -111,7 +119,10 @@ class Sara():
                         anneal_strategy= scheduler.get('anneal_strategy', 'cos'))
 
         self.train = Train(self.model_name, self.device, train_loader, optimizer, self.criterion)
-        self.test = Test(self.model_name, self.device, test_loader, self.criterion)
+        if self.val_loader:
+            self.test = Test(self.model_name, self.device, val_loader, self.criterion)
+        else:
+            self.test = Test(self.model_name, self.device, test_loader, self.criterion)
         
         print('='*20 + 'START' + '='*20)
         for epoch in range(epochs):
@@ -134,15 +145,29 @@ class Sara():
             plt.show()
 
         print('='*20 + ' RESULTS ' + '='*20)
-        print('Best Test Accuracy: ', max(self.train.train_endacc))
-        print('Best Train Accuracy: ', max(self.test.test_acc))
+        print('Best Train Accuracy: ', max(self.train.train_endacc))
+        if self.val_loader:
+            print('Best Validation Accuracy: ', max(self.test.test_acc))
+            print('Runnign Best Model on Test Loader:')
+            self.best_model = self.model_name.to(self.device)
+            self.best_model.load_state_dict(torch.load('/content/classifier.pt'))
+            self.best_model.eval()
+            self.final_test = Test(self.model_name, self.device, test_loader, self.criterion)
+            self.final_test.test()
+            print('Best Testing Accuracy: ', max(self.final_test.test_acc))
+        else:
+            print('Best Testing Accuracy: ', max(self.test.test_acc))
         print('='*49)
         
     def plot_graphs(self, test_loader, accuracy_plot= True, testvtrain_plot= True, classwise_acc= True):
-
-        self.best_model = self.model_name.to(self.device)
-        self.best_model.load_state_dict(torch.load('/content/classifier.pt'))
-        self.best_model.eval()
+        
+        try:
+            self.best_model.eval()
+        except:
+            self.best_model = self.model_name.to(self.device)
+            self.best_model.load_state_dict(torch.load('/content/classifier.pt'))
+            self.best_model.eval()
+        
         print('Best Model Loaded!')
 
         if accuracy_plot:
@@ -154,22 +179,22 @@ class Sara():
         if classwise_acc:
             class_acc(self.best_model, self.device, test_loader)
         
-    def missed_images(self, test_loader, no_images=36, GradCAM_pred= True, GradCAM_act = True,
+    def missed_images(self, test_loader, dataset_used='CIFAR10', miss_no_images=36, cam_no_images= 36, GradCAM_pred= True, GradCAM_act = True,
                         layers=['layer1', 'layer2', 'layer3', 'layer4'],
                         hm_lay=0.4, img_lay= 0.6, display_layer= None):
-
+        self.classes = classes
         if display_layer is None:
             display_layer = len(layers)
-        mis(self.best_model, self.device, test_loader, no_images)
+        mis(self.best_model, self.device, test_loader, miss_no_images, dataset_used= dataset_used)
         plt.show()
         for layer in layers:
             if GradCAM_pred:
-                gen_cam(self.best_model, layer, hm_lay=hm_lay, img_lay= img_lay)
+                gen_cam(self.best_model, layer, hm_lay=hm_lay, img_lay= img_lay, dataset_used= dataset_used)
             if GradCAM_act:
                 gen_cam(self.best_model, layer, class_idx = true_list, 
-                                hm_lay=hm_lay, img_lay= img_lay)
+                                hm_lay=hm_lay, img_lay= img_lay, dataset_used= dataset_used)
         
         print('*'*10 + 'Grad-CAM of Mis Classified Images with respect to Predicted(wrong) Class' + '*'*10)
-        plot_pred_cam(no_images, display_layer)
+        plot_pred_cam(cam_no_images, display_layer)
         print('*'*10 + 'Grad-CAM of Mis Classified Images with respect to Actual(correct) Class' + '*'*10)
-        plot_act_cam(no_images, display_layer)
+        plot_act_cam(cam_no_images, display_layer)

@@ -94,3 +94,42 @@ class CIFAR10_AlbumTrans(AugmentationBase):
             ToTensor()
         ])
         return AlbumentationTrans(test_trans)
+
+class TinyImageNet_AlbumTrans(AugmentationBase):
+
+    def __init__(self, augs= None):
+      self.augs = augs
+
+    def build_train(self):
+        
+        if self.augs is None:
+          train_trans = alb.Compose([
+            
+              alb.RandomCrop(56,56, always_apply= True),
+              alb.HorizontalFlip(),
+              alb.Rotate((-20,20)),
+              alb.CoarseDropout(
+                  max_holes=1, max_height=28, max_width=28, min_holes=1, min_height=28, min_width=28, 
+                  fill_value=[0.4802*255, 0.4481*255, 0.3975*255], always_apply=False
+              ),
+              alb.Normalize(
+                  mean = [0.4802, 0.4481, 0.3975],
+                  std = [0.2302, 0.2265, 0.2262]
+              ),
+              ToTensor()
+          ])
+        else:
+          train_trans = alb.Compose(self.augs)
+        
+        return AlbumentationTrans(train_trans)
+
+    def build_test(self):
+        test_trans = alb.Compose([
+            alb.Resize(56,56),
+            alb.Normalize(
+                mean = [0.4802, 0.4481, 0.3975],
+                std = [0.2302, 0.2265, 0.2262]
+            ),
+            ToTensor()
+        ])
+        return AlbumentationTrans(test_trans)

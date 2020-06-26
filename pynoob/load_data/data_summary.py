@@ -6,12 +6,11 @@ import matplotlib.pyplot as plt
 from torchsummary import summary
 import torchvision
 
-classes = ('plane', 'car', 'bird', 'cat',
-            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+from .datasets import _Getdata
 
-def model_summary(model):
+def model_summary(model, input_size= (3, 32, 32)):
     """Displays the Summary of the Architecture - All the methods used and the parameters used"""
-    summary(model, input_size=(3, 32, 32))
+    summary(model, input_size=input_size)
 
 def _imshow(img):
     inv_norm = transforms.Normalize(
@@ -22,7 +21,14 @@ def _imshow(img):
     plt.figure()
     plt.imshow(np.transpose(npimg, (1, 2, 0)), interpolation= 'bilinear')
 
-def display(train_loader, n= 64,):
+def display(train_loader, n= 64, dataset_used = 'CIFAR10'):
+
+    if dataset_used == 'CIFAR10':
+      classes = ('plane', 'car', 'bird', 'cat',
+            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    if dataset_used == 'TinyImageNet':
+      classes = _Getdata()._get_class_to_id_dict()
+      classes = list(classes.keys())
 
     # get some random training images
     dataiter = iter(train_loader)

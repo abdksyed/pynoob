@@ -12,18 +12,24 @@ from torchvision.utils import save_image
 from math import floor
 
 from .gradCAM import GradCAM
-
-classes = ('plane', 'car', 'bird', 'cat',
-            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+from ..load_data import _Getdata
 
 pred_list= []
 true_list = []
+classes = []
 device = 'cuda'
 
-def inv_norm(image):
+def inv_norm(image, dataset_used= 'CIFAR10'):
+
+    if dataset_used == 'CIFAR10':
+      mean = (-0.4914/0.2023, -0.4822/0.1994, -0.4465/0.2010)
+      std = (1/0.2023, 1/0.1994, 1/0.2010)
+    if dataset_used == 'TinyImageNet':
+      mean = (-0.4802/0.2302, -0.4481/0.1994, -0.3975/0.2262)
+      std = (1/0.2302, 1/0.2265, 1/0.2262)
     inv_norm_transform = transforms.Normalize(
-        mean=(-0.4914/0.2023, -0.4822/0.1994, -0.4465/0.2010),
-        std=(1/0.2023, 1/0.1994, 1/0.2010))
+        mean=mean,
+        std=std)
     return inv_norm_transform(image)
     
 def _test_mis(model, device, test_loader):
@@ -59,9 +65,16 @@ def _test_mis(model, device, test_loader):
             
     return true_label, pred_label, misclass_image
 
-def mis(model, device, test_loader, nimage = 64):
+def mis(model, device, test_loader, nimage = 64, dataset_used= 'CIFAR10'):
     """Display the 'nimage' number of misclassified images."""
     
+    if dataset_used == 'CIFAR10':
+      classes = ('plane', 'car', 'bird', 'cat',
+            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    if dataset_used == 'TinyImageNet':
+      classes = _Getdata()._get_class_to_id_dict()
+      classes = list(classes.keys())
+
     #############
     #Create directory for saving misclassified images 
     dirName = '/content/mis_class/'
@@ -89,18 +102,18 @@ def mis(model, device, test_loader, nimage = 64):
         plt.subplot(int(np.sqrt(nimage)), int(np.sqrt(nimage)), index+1)
         plt.xticks([])
         plt.yticks([])
-        x = inv_norm(img[index])      # unnormalize
+        x = inv_norm(img[index], dataset_used= dataset_used)      # unnormalize
         x = x.permute(1, 2, 0) # (C, M, N) -> (M, N, C)
         x = x.cpu().numpy()
 
         ###########
         #To Save mis classified image for further use in GradCAM
         path = f'/content/mis_class/images/mis_{index+10}.png'
-        mis_img = Image.fromarray((x.squeeze() * 255).astype(np.uint8))
+        mis_img = Image.fromarray((x.squeeze() * 255/x.max()).astype(np.uint8))
         mis_img.save(path)
         #########
 
-        plt.imshow(x.squeeze(), cmap='gray_r', interpolation= 'bilinear')
+        plt.imshow((x.squeeze() * 255/x.max()).astype(np.uint8), cmap='gray_r', interpolation= 'bilinear')
         plt.setp(plt.title(f'Predicted: {classes[plab[index,0]]}'), color= 'red')
         pred_list.append(classes[plab[index,0]])
         plt.setp(plt.xlabel(f'Ground Truth: {classes[tlab[index,0]]}'), color= 'blue')
@@ -127,7 +140,7 @@ def _visualize_cam(mask, img, hm_lay=0.5, img_lay=0.5, alpha=1.0):
 
     return heatmap, result
 
-def gen_cam(model, layer, class_idx= None, hm_lay= 0.5, img_lay= 0.5):
+def gen_cam(model, layer, class_idx= None, hm_lay= 0.5, img_lay= 0.5, dataset_used= 'CIFAR10'):
     
     #############
     #Create directory for saving GradCAM images.
@@ -156,6 +169,13 @@ def gen_cam(model, layer, class_idx= None, hm_lay= 0.5, img_lay= 0.5):
            #print("Directory " , dirName , " already exists")
            #print("Directory " , dir2Name , " already exists")
     
+    if dataset_used == 'CIFAR10':
+      classes = ('plane', 'car', 'bird', 'cat',
+            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    if dataset_used == 'TinyImageNet':
+      classes = _Getdata()._get_class_to_id_dict()
+      classes = list(classes.keys())
+      
     model_layer = getattr(model, layer)
     gradcam = GradCAM(model, model_layer)
 
@@ -168,7 +188,7 @@ def gen_cam(model, layer, class_idx= None, hm_lay= 0.5, img_lay= 0.5):
     for index, batch in enumerate(dataloader):
       normed_torch_img, _ = batch
 
-      torch_img = inv_norm(normed_torch_img[0])
+      torch_img = inv_norm(normed_torch_img[0], dataset_used=dataset_used)
       if class_idx is None:
           class_idx_ = None
       else:
@@ -203,7 +223,7 @@ def plot_pred_cam(n,l):
         path = f'/content/result_pred/result{index+10}_layer{layer+1}.png'
         img = plt.imread(path)
         axes[index, layer+2].imshow(img.squeeze(), cmap='gray_r', interpolation= 'bilinear')
-        axes[index, layer+2].set_title(f'Later: {layer+1}')
+        axes[index, layer+2].set_title(f'Layer: {layer+1}')
         axes[index, layer+2].axis('off')
   plt.tight_layout()
   plt.subplots_adjust(top=0.97)
@@ -226,7 +246,7 @@ def plot_act_cam(n,l):
         path = f'/content/result_act/result{index+10}_layer{layer+1}.png'
         img = plt.imread(path)
         axes[index, layer+2].imshow(img.squeeze(), cmap='gray_r', interpolation= 'bilinear')
-        axes[index, layer+2].set_title(f'Later: {layer+1}')
+        axes[index, layer+2].set_title(f'Layer: {layer+1}')
         axes[index, layer+2].axis('off')
   plt.tight_layout()
   plt.subplots_adjust(top=0.97)
@@ -249,7 +269,7 @@ def plot_pred_heatmap(n,l):
         path = f'/content/heatmap_pred/heatmap{index+10}_layer{layer+1}.png'
         img = plt.imread(path)
         axes[index, layer+2].imshow(img.squeeze(), cmap='gray_r', interpolation= 'bilinear')
-        axes[index, layer+2].set_title(f'Later: {layer+1}')
+        axes[index, layer+2].set_title(f'Layer: {layer+1}')
         axes[index, layer+2].axis('off')
   plt.tight_layout()
   plt.subplots_adjust(top=0.97)
@@ -272,7 +292,7 @@ def plot_act_heatmap(n,l):
         path = f'/content/heatmap_act/heatmap{index+10}_layer{layer+1}.png'
         img = plt.imread(path)
         axes[index, layer+2].imshow(img.squeeze(), cmap='gray_r', interpolation= 'bilinear')
-        axes[index, layer+2].set_title(f'Later: {layer+1}')
+        axes[index, layer+2].set_title(f'Layer: {layer+1}')
         axes[index, layer+2].axis('off')
   plt.tight_layout()
   plt.subplots_adjust(top=0.97)
